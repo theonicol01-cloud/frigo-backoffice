@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Frigo connecte - Dashboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 1400px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #f5f5f5;
+      color: #222;
+    }
+    h1 { color: #1a3a5c; margin-bottom: 5px; }
+    .sous-titre { color: #666; margin-bottom: 25px; }
+
+    nav { margin-bottom: 20px; }
+    nav a {
+      color: #2c5f8f;
+      text-decoration: none;
+      margin-right: 20px;
+      font-weight: bold;
+    }
+    nav a:hover { text-decoration: underline; }
+
+    /* Cartes de synthese */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .stat-card .valeur {
+      font-size: 32px;
+      font-weight: bold;
+      color: #1a3a5c;
+    }
+    .stat-card .label {
+      color: #666;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .stat-card.alert .valeur { color: #c65d1e; }
+    .stat-card.success .valeur { color: #3a8f3a; }
+
+    /* Cartes generales */
+    .card {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      margin-top: 0;
+      color: #1a3a5c;
+      border-bottom: 2px solid #e0e6ec;
+      padding-bottom: 10px;
+    }
+
+    /* Frigos en ligne */
+    .frigo-item {
+      display: grid;
+      grid-template-columns: 40px 2fr 1fr 1fr 1fr;
+      gap: 15px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .frigo-item:last-child { border-bottom: none; }
+    .badge {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .badge.online { background: #3a8f3a; box-shadow: 0 0 8px #3a8f3a; }
+    .badge.offline { background: #c65d1e; }
+    .badge.stale { background: #e6a72e; }
+
+    /* Table des evenements */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+    }
+    th {
+      background: #1a3a5c;
+      color: white;
+      position: sticky;
+      top: 0;
+    }
+    tr:hover { background: #fafafa; }
+
+    .type-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .type-vente { background: #eaf5ea; color: #3a8f3a; }
+    .type-reapprovisionnement { background: #e8f0f6; color: #2c5f8f; }
+    .type-calibration { background: #f0e8f6; color: #6b3a8f; }
+    .type-alerte_ecart { background: #fff8e1; color: #c65d1e; }
+
+    .empty {
+      color: #999;
+      font-style: italic;
+      text-align: center;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Dashboard - Frigo connecte</h1>
+  <p class="sous-titre">Vue en temps reel de vos frigos et des ventes</p>
+
+  <nav>
+    <a href="index.html">Produits</a>
+    <a href="dashboard.html">Dashboard</a>
+  </nav>
+
+  <!-- Statistiques du jour -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="label">Frigos en ligne</div>
+      <div class="valeur" id="statFrigosEnLigne">-</div>
+    </div>
+    <div class="stat-card success">
+      <div class="label">Ventes aujourd'hui</div>
+      <div class="valeur" id="statVentesJour">-</div>
+    </div>
+    <div class="stat-card success">
+      <div class="label">CA du jour</div>
+      <div class="valeur" id="statCaJour">- EUR</div>
+    </div>
+    <div class="stat-card alert">
+      <div class="label">Alertes 24h</div>
+      <div class="valeur" id="statAlertes">-</div>
+    </div>
+  </div>
+
+  <!-- Etat des frigos -->
+  <div class="card">
+    <h2>Etat des cellules</h2>
+    <div id="listeFrigos">
+      <div class="empty">Chargement...</div>
+    </div>
+  </div>
+
+  <!-- Derniers evenements -->
+  <div class="card">
+    <h2>Derniers evenements</h2>
+    <table id="tableEvenements">
+      <thead>
+        <tr>
+          <th>Heure</th>
+          <th>Frigo</th>
+          <th>Cellule</th>
+          <th>Type</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="5" class="empty">Chargement...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from
+      "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+    import { getFirestore, collection, query, orderBy, limit,
+             onSnapshot, where, Timestamp } from
+      "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+    // Configuration Firebase (Theo)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBkKHg8utP-dmP2h8ws64zOQe82Fhdf0Z0",
+      authDomain: "back-frigo.firebaseapp.com",
+      projectId: "back-frigo",
+      storageBucket: "back-frigo.firebasestorage.app",
+      messagingSenderId: "541077182352",
+      appId: "1:541077182352:web:0289b3a3ac37497c044515"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // === ETAT DES FRIGOS (temps reel) ===
+    onSnapshot(collection(db, "balance_status"), (snapshot) => {
+      const container = document.getElementById("listeFrigos");
+      container.innerHTML = "";
+
+      if (snapshot.empty) {
+        container.innerHTML = '<div class="empty">Aucune cellule detectee. Lancez le programme Python !</div>';
+        document.getElementById("statFrigosEnLigne").textContent = "0";
+        return;
+      }
+
+      let frigosEnLigne = 0;
+      const maintenant = Date.now();
+
+      snapshot.forEach((doc) => {
+        const s = doc.data();
+        const derniereMaj = s.derniere_maj ? s.derniere_maj.toDate() : null;
+        const secondesDepuisMaj = derniereMaj ? (maintenant - derniereMaj.getTime()) / 1000 : Infinity;
+
+        // Statut : online si maj < 60s, stale si < 10min, offline sinon
+        let statut, statutTexte;
+        if (!s.en_ligne || secondesDepuisMaj > 600) {
+          statut = "offline";
+          statutTexte = "Hors ligne";
+        } else if (secondesDepuisMaj > 60) {
+          statut = "stale";
+          statutTexte = "Retard";
+        } else {
+          statut = "online";
+          statutTexte = "En ligne";
+          frigosEnLigne++;
+        }
+
+        const derniereMajTexte = derniereMaj
+          ? formatIlYA(secondesDepuisMaj)
+          : "jamais";
+
+        const div = document.createElement("div");
+        div.className = "frigo-item";
+        div.innerHTML = `
+          <span class="badge ${statut}"></span>
+          <div>
+            <strong>${s.frigo_id || "?"}</strong> — Cellule ${s.cellule_id || "?"}
+          </div>
+          <div>Poids actuel : <strong>${s.poids_actuel !== undefined ? s.poids_actuel.toFixed(1) + " g" : "-"}</strong></div>
+          <div>Ref : ${s.poids_reference !== undefined ? s.poids_reference.toFixed(1) + " g" : "-"}</div>
+          <div style="color: ${statut === 'online' ? '#3a8f3a' : (statut === 'stale' ? '#e6a72e' : '#c65d1e')};">
+            ${statutTexte}<br><small>${derniereMajTexte}</small>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+
+      document.getElementById("statFrigosEnLigne").textContent = frigosEnLigne;
+    });
+
+    // === DERNIERS EVENEMENTS (temps reel, 20 derniers) ===
+    const qEvenements = query(
+      collection(db, "evenements"),
+      orderBy("horodatage", "desc"),
+      limit(20)
+    );
+
+    onSnapshot(qEvenements, (snapshot) => {
+      const tbody = document.querySelector("#tableEvenements tbody");
+      tbody.innerHTML = "";
+
+      if (snapshot.empty) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">Aucun evenement pour le moment.</td></tr>';
+        return;
+      }
+
+      snapshot.forEach((doc) => {
+        const e = doc.data();
+        const horodatage = e.horodatage ? e.horodatage.toDate() : null;
+        const heureTexte = horodatage
+          ? horodatage.toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit", day: "2-digit", month: "2-digit" })
+          : "-";
+
+        let details = "";
+        if (e.type === "vente") {
+          details = `<strong>${e.quantite || 1}x ${e.produit_nom || "?"}</strong> - ${(e.montant_total || 0).toFixed(2)} EUR (${(e.variation_g || 0).toFixed(1)} g)`;
+        } else if (e.type === "calibration") {
+          details = `Facteur : ${(e.facteur || 0).toFixed(2)}, Reference : ${e.poids_reference || 0} g`;
+        } else if (e.type === "reapprovisionnement") {
+          details = `+${(e.variation_g || 0).toFixed(1)} g de <strong>${e.produit_nom || "?"}</strong>`;
+        } else if (e.type === "alerte_ecart") {
+          details = `Variation ${(e.variation_g || 0).toFixed(1)} g, ecart ${(e.ecart || 0).toFixed(1)} g pour ${e.produit_nom || "?"}`;
+        }
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${heureTexte}</td>
+          <td>${e.frigo_id || "-"}</td>
+          <td>${e.cellule_id || "-"}</td>
+          <td><span class="type-badge type-${e.type}">${e.type || "?"}</span></td>
+          <td>${details}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    });
+
+    // === STATISTIQUES DU JOUR (ventes + CA) ===
+    // On calcule sur les evenements du jour (depuis minuit)
+    const debutJour = new Date();
+    debutJour.setHours(0, 0, 0, 0);
+    const debutJourTs = Timestamp.fromDate(debutJour);
+
+    const qVentesJour = query(
+      collection(db, "evenements"),
+      where("type", "==", "vente"),
+      where("horodatage", ">=", debutJourTs)
+    );
+
+    onSnapshot(qVentesJour, (snapshot) => {
+      let nbVentes = 0;
+      let caTotal = 0;
+      snapshot.forEach((doc) => {
+        const e = doc.data();
+        nbVentes += e.quantite || 1;
+        caTotal += e.montant_total || 0;
+      });
+      document.getElementById("statVentesJour").textContent = nbVentes;
+      document.getElementById("statCaJour").textContent = caTotal.toFixed(2) + " EUR";
+    });
+
+    // === ALERTES DES DERNIERES 24H ===
+    const il_y_a_24h = new Date();
+    il_y_a_24h.setHours(il_y_a_24h.getHours() - 24);
+    const il_y_a_24h_ts = Timestamp.fromDate(il_y_a_24h);
+
+    const qAlertes = query(
+      collection(db, "evenements"),
+      where("type", "==", "alerte_ecart"),
+      where("horodatage", ">=", il_y_a_24h_ts)
+    );
+
+    onSnapshot(qAlertes, (snapshot) => {
+      document.getElementById("statAlertes").textContent = snapshot.size;
+    });
+
+    // === UTILITAIRE : formatage "il y a X" ===
+    function formatIlYA(secondes) {
+      if (secondes < 60) return `il y a ${Math.floor(secondes)}s`;
+      if (secondes < 3600) return `il y a ${Math.floor(secondes/60)}min`;
+      if (secondes < 86400) return `il y a ${Math.floor(secondes/3600)}h`;
+      return `il y a ${Math.floor(secondes/86400)} jours`;
+    }
+
+    // Rafraichir l'affichage des "il y a X" toutes les 10 secondes
+    setInterval(() => {
+      // Force le rechargement du snapshot balance_status
+      // (les timestamps se mettent a jour automatiquement)
+    }, 10000);
+  </script>
+</body>
+</html>
