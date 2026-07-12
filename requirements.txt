@@ -1,0 +1,5 @@
+fastapi==0.68.2
+uvicorn==0.17.6
+python-dotenv>=0.21.0
+resend>=2.0.0
+email-validator>=1.1.3
